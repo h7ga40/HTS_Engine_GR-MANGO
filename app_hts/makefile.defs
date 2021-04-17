@@ -1,0 +1,5 @@
+LINKER_SCRIPT := linker_script.ld
+
+linker_script.ld: ../../mbed_os/targets/TARGET_RENESAS/TARGET_RZ_A2XX/TARGET_GR_MANGO/device/TOOLCHAIN_GCC_ARM/RZA2M.ld
+	arm-none-eabi-gcc -x none -E -P -o "$@" - < "$<"
+
