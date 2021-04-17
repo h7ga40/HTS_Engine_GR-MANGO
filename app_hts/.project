@@ -3,6 +3,15 @@
 	<name>app_hts</name>
 	<comment></comment>
 	<projects>
+		<project>hts_engine</project>
+		<project>mbed_gr_libs</project>
+		<project>mbed_http</project>
+		<project>mbed_os</project>
+		<project>mbed_os_cpp</project>
+		<project>mbed_os_lwipstack</project>
+		<project>mbed_os_mbedtls</project>
+		<project>mbed_os_nanostack</project>
+		<project>mbed_os_nfc</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>
