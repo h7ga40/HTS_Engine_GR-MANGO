@@ -6,7 +6,23 @@
 #undef USBHOST_MSD
 #include "SdUsbConnect.h"
 #include "AUDIO_GRBoard.h"
+
+/* Main headers */
+#include "mecab.h"
+#include "njd.h"
+#include "jpcommon.h"
 #include "HTS_engine.h"
+
+/* Sub headers */
+#include "text2mecab.h"
+#include "mecab2njd.h"
+#include "njd_set_pronunciation.h"
+#include "njd_set_digit.h"
+#include "njd_set_accent_phrase.h"
+#include "njd_set_accent_type.h"
+#include "njd_set_unvoiced_vowel.h"
+#include "njd_set_long_vowel.h"
+#include "njd2jpcommon.h"
 
 #define MAXBUFLEN 1024
 
@@ -134,9 +150,105 @@ void HTS_Audio_clear(HTS_Audio * audio)
 {
 }
 
+typedef struct _Open_JTalk {
+	Mecab mecab;
+	NJD njd;
+	JPCommon jpcommon;
+	HTS_Engine engine;
+} Open_JTalk;
+
+static void Open_JTalk_initialize(Open_JTalk *open_jtalk)
+{
+	//Mecab_initialize(&open_jtalk->mecab);
+	NJD_initialize(&open_jtalk->njd);
+	JPCommon_initialize(&open_jtalk->jpcommon);
+	HTS_Engine_initialize(&open_jtalk->engine);
+}
+
+static void Open_JTalk_clear(Open_JTalk *open_jtalk)
+{
+	//Mecab_clear(&open_jtalk->mecab);
+	NJD_clear(&open_jtalk->njd);
+	JPCommon_clear(&open_jtalk->jpcommon);
+	HTS_Engine_clear(&open_jtalk->engine);
+}
+
+static int Open_JTalk_load(Open_JTalk *open_jtalk, const char *dn_mecab, const char *fn_voice)
+{
+	//if (Mecab_load(&open_jtalk->mecab, dn_mecab) != TRUE) {
+	//	Open_JTalk_clear(open_jtalk);
+	//	return 0;
+	//}
+	if (HTS_Engine_load(&open_jtalk->engine, &fn_voice, 1) != TRUE) {
+		Open_JTalk_clear(open_jtalk);
+		return 0;
+	}
+	if (strcmp(HTS_Engine_get_fullcontext_label_format(&open_jtalk->engine), "HTS_TTS_JPN") != 0) {
+		Open_JTalk_clear(open_jtalk);
+		return 0;
+	}
+	return 1;
+}
+
+static int Open_JTalk_synthesis(Open_JTalk *open_jtalk, const char *const *lines, int count,
+	FILE *wavfp, FILE *logfp)
+{
+	int result = 0;
+	//char buff[MAXBUFLEN];
+
+	//text2mecab(buff, txt);
+	//Mecab_analysis(&open_jtalk->mecab, buff);
+	//mecab2njd(&open_jtalk->njd, Mecab_get_feature(&open_jtalk->mecab),
+	//	Mecab_get_size(&open_jtalk->mecab));
+	for (int i = 0; i < count; i++) {
+		NJDNode *node = (NJDNode *)calloc(1, sizeof(NJDNode));
+		NJDNode_initialize(node);
+		NJDNode_load(node, lines[i]);
+		NJD_push_node(&open_jtalk->njd, node);
+	}
+	njd_set_pronunciation(&open_jtalk->njd);
+	njd_set_digit(&open_jtalk->njd);
+	njd_set_accent_phrase(&open_jtalk->njd);
+	njd_set_accent_type(&open_jtalk->njd);
+	njd_set_unvoiced_vowel(&open_jtalk->njd);
+	njd_set_long_vowel(&open_jtalk->njd);
+	njd2jpcommon(&open_jtalk->jpcommon, &open_jtalk->njd);
+	JPCommon_make_label(&open_jtalk->jpcommon);
+	if (JPCommon_get_label_size(&open_jtalk->jpcommon) > 2) {
+		if (HTS_Engine_synthesize_from_strings
+		(&open_jtalk->engine, JPCommon_get_label_feature(&open_jtalk->jpcommon),
+			JPCommon_get_label_size(&open_jtalk->jpcommon)) == TRUE)
+			result = 1;
+		if (wavfp != NULL)
+			HTS_Engine_save_riff(&open_jtalk->engine, wavfp);
+		if (logfp != NULL) {
+			fprintf(logfp, "[Text analysis result]\n");
+			NJD_fprint(&open_jtalk->njd, logfp);
+			fprintf(logfp, "\n[Output label]\n");
+			HTS_Engine_save_label(&open_jtalk->engine, logfp);
+			fprintf(logfp, "\n");
+			HTS_Engine_save_information(&open_jtalk->engine, logfp);
+		}
+		HTS_Engine_refresh(&open_jtalk->engine);
+	}
+	JPCommon_refresh(&open_jtalk->jpcommon);
+	NJD_refresh(&open_jtalk->njd);
+	Mecab_refresh(&open_jtalk->mecab);
+
+	return result;
+}
+
 #define MOUNT_NAME             "storage"
 SdUsbConnect storage(MOUNT_NAME);
 
+struct synse_list_t {
+	const char *const *labels;
+	int count;
+	const char *voice;
+};
+
+#define OPEN_JTALK 1
+#if !OPEN_JTALK
 const char *const label1[] = {
 	"xx^xx-sil+k=o/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx/D:09+xx_xx/E:xx_xx!xx_xx-xx/F:xx_xx#xx_xx@xx_xx|xx_xx/G:5_5%0_xx_xx/H:xx_xx/I:xx-xx@xx+xx&xx-xx|xx+xx/J:1_5/K:4+5-20",
 	"xx^sil-k+o=N/A:-4+1+5/B:xx-xx_xx/C:09_xx+xx/D:04+xx_xx/E:xx_xx!xx_xx-xx/F:5_5#0_xx@1_1|1_5/G:4_4%0_xx_0/H:xx_xx/I:1-5@1+4&1-5|1+20/J:1_4/K:4+5-20",
@@ -348,10 +460,82 @@ const char *const label4[] = {
 	"d^a-sil+xx=xx/A:xx+xx+xx/B:10-7_2/C:xx_xx+xx/D:xx+xx_xx/E:3_1!0_xx-xx/F:xx_xx#xx_xx@xx_xx|xx_xx/G:xx_xx%xx_xx_xx/H:5_20/I:xx-xx@xx+xx&xx-xx|xx+xx/J:xx_xx/K:3+12-44",
 };
 
-struct synse_list_t {
-	const char *const *labels;
-	int count;
-	const char *voice;
+synse_list_t synse_list[] = {
+	{label1, sizeof(label1) / sizeof(label1[0]), "/" MOUNT_NAME "/mei/mei_normal.htsvoice"},
+	{label2, sizeof(label2) / sizeof(label2[0]), "/" MOUNT_NAME "/mei/mei_sad.htsvoice"},
+	{label3, sizeof(label3) / sizeof(label3[0]), "/" MOUNT_NAME "/nitech_jp_atr503_m001.htsvoice"},
+	{label4, sizeof(label4) / sizeof(label4[0]), "/" MOUNT_NAME "/mei/mei_happy.htsvoice"},
+};
+#else
+const char *const label1[] = {
+	"私,名詞,代名詞,一般,*,*,*,私,ワタシ,ワタシ,0/3,C3",
+	"は,助詞,係助詞,*,*,*,*,は,ハ,ワ,0/1,名詞%F1/動詞%F2@0/形容詞%F2@0",
+	"、,記号,読点,*,*,*,*,、,、,、,*/*,*",
+	"ジー,副詞,*,*,*,*,*,ジー,ジイ,ジー,0/2,*",
+	"アール,名詞,一般,*,*,*,*,アール,アール,アール,1/3,C1",
+	"マンゴー,名詞,一般,*,*,*,*,マンゴー,マンゴー,マンゴー,1/4,C1",
+	"です,助動詞,*,*,*,特殊・デス,基本形,です,デス,デス’,1/2,名詞%F2@1/動詞%F1/形容詞%F2@0",
+	"。,記号,句点,*,*,*,*,。,。,。,*/*,*",
+};
+
+const char *const label2[] = {
+	"私,名詞,代名詞,一般,*,*,*,私,ワタシ,ワタシ,0/3,C3",
+	"は,助詞,係助詞,*,*,*,*,は,ハ,ワ,0/1,名詞%F1/動詞%F2@0/形容詞%F2@0",
+	"、,記号,読点,*,*,*,*,、,、,、,*/*,*",
+	"情報,名詞,一般,*,*,*,*,情報,ジョウホウ,ジョーホー,0/4,C2",
+	"の,助詞,連体化,*,*,*,*,の,ノ,ノ,0/1,動詞%F2@0/形容詞%F1",
+	"海,名詞,一般,*,*,*,*,海,ウミ,ウミ,1/2,C3",
+	"で,助詞,格助詞,一般,*,*,*,で,デ,デ,1/1,動詞%F1",
+	"発生,名詞,サ変接続,*,*,*,*,発生,ハッセイ,ハッセー,0/4,C2",
+	"し,動詞,自立,*,*,サ変・スル,連用形,する,シ,シ,0/1,*",
+	"た,助動詞,*,*,*,特殊・タ,基本形,た,タ,タ,0/1,動詞%F2@1/形容詞%F4@-2",
+	"、,記号,読点,*,*,*,*,、,、,、,*/*,*",
+	"せいめい,名詞,サ変接続,*,*,*,*,せいめい,セイメイ,セイメイ,0/4,C2",
+	"たい,動詞,自立,*,*,五段・カ行イ音便,連用タ接続,たく,タイ,タイ,0/2,*",
+	"だ,助動詞,*,*,*,特殊・タ,基本形,だ,ダ,ダ,0/1,動詞%F1",
+	"。,記号,句点,*,*,*,*,。,。,。,*/*,*",
+};
+
+const char *const label3[] = {
+	"確認,名詞,サ変接続,*,*,*,*,確認,カクニン,カクニン,0/4,C2",
+	"し,動詞,自立,*,*,サ変・スル,連用形,する,シ,シ,0/1,*",
+	"た,助動詞,*,*,*,特殊・タ,基本形,た,タ,タ,0/1,動詞%F2@1/形容詞%F4@-2",
+	"。,記号,句点,*,*,*,*,。,。,。,*/*,*",
+	"間違い,名詞,ナイ形容詞語幹,*,*,*,*,間違い,マチガイ,マチガイ,3/4,C1",
+	"なく,助動詞,*,*,*,特殊・ナイ,連用テ接続,ない,ナク,ナク,1/2,動詞%F3@0",
+	"彼,名詞,代名詞,一般,*,*,*,彼,カレ,カレ,1/2,C3",
+	"だ,助動詞,*,*,*,特殊・ダ,基本形,だ,ダ,ダ,0/1,動詞%F1",
+	"。,記号,句点,*,*,*,*,。,。,。,*/*,*",
+};
+
+const char *const label4[] = {
+	"わずか,副詞,助詞類接続,*,*,*,*,わずか,ワズカ,ワズカ,1/3,*",
+	"な,助動詞,*,*,*,特殊・ダ,体言接続,だ,ナ,ナ,1/1,動詞%F3@0",
+	"機能,名詞,サ変接続,*,*,*,*,機能,キノウ,キノー,1/3,C1",
+	"に,助詞,格助詞,一般,*,*,*,に,ニ,ニ,0/1,動詞%F5/形容詞%F1/名詞%F1",
+	"隷属,名詞,サ変接続,*,*,*,*,隷属,レイゾク,レーゾク,0/4,C2",
+	"し,動詞,自立,*,*,サ変・スル,連用形,する,シ,シ,0/1,*",
+	"て,助詞,接続助詞,*,*,*,*,て,テ,テ,0/1,動詞%F1/形容詞%F1/名詞%F5",
+	"い,動詞,非自立,*,*,一段,連用形,いる,イ,イ,0/1,*",
+	"た,助動詞,*,*,*,特殊・タ,基本形,た,タ,タ,0/1,動詞%F2@1/形容詞%F4@-2",
+	"が,助詞,接続助詞,*,*,*,*,が,ガ,ガ,0/1,名詞%F1",
+	"、,記号,読点,*,*,*,*,、,、,、,*/*,*",
+};
+
+const char *const label5[] = {
+	"制約,名詞,サ変接続,*,*,*,*,制約,セイヤク,セーヤク,0/4,C2",
+	"を,助詞,格助詞,一般,*,*,*,を,ヲ,ヲ,0/1,動詞%F5/名詞%F1",
+	"捨て,動詞,自立,*,*,一段,連用形,捨てる,ステ,ステ,0/2,*",
+	"、,記号,読点,*,*,*,*,、,、,、,*/*,*",
+	"更なる,連体詞,*,*,*,*,*,更なる,サラナル,サラナル,1/4,*",
+	"上部,名詞,一般,*,*,*,*,上部,ジョウブ,ジョーブ,1/3,C1",
+	"構造,名詞,一般,*,*,*,*,構造,コウゾウ,コーゾー,0/4,C2",
+	"へ,助詞,格助詞,一般,*,*,*,へ,ヘ,エ,0/1,名詞%F1",
+	"シフト,名詞,サ変接続,*,*,*,*,シフト,シフト,シフト,1/3,C1",
+	"する,動詞,自立,*,*,サ変・スル,基本形,する,スル,スル,0/2,*",
+	"とき,名詞,非自立,副詞可能,*,*,*,とき,トキ,トキ,1/2,C3",
+	"だ,助動詞,*,*,*,特殊・ダ,基本形,だ,ダ,ダ,0/1,動詞%F1",
+	"。,記号,句点,*,*,*,*,。,。,。,*/*,*",
 };
 
 synse_list_t synse_list[] = {
@@ -359,15 +543,30 @@ synse_list_t synse_list[] = {
 	{label2, sizeof(label2) / sizeof(label2[0]), "/" MOUNT_NAME "/mei/mei_sad.htsvoice"},
 	{label3, sizeof(label3) / sizeof(label3[0]), "/" MOUNT_NAME "/nitech_jp_atr503_m001.htsvoice"},
 	{label4, sizeof(label4) / sizeof(label4[0]), "/" MOUNT_NAME "/mei/mei_happy.htsvoice"},
+	{label5, sizeof(label5) / sizeof(label5[0]), "/" MOUNT_NAME "/mei/mei_happy.htsvoice"},
 };
+#endif
 
+#if !OPEN_JTALK
 /* hts_engine API */
 HTS_Engine engine;
+#else
+/* Open JTalk */
+Open_JTalk open_jtalk;
+#endif
 
 extern "C" void wmem_init();
 
 int main()
 {
+	const char *dn_dict = "/" MOUNT_NAME "/dic";
+	//const char *fn_voice = "/" MOUNT_NAME "/nitech_jp_atr503_m001.htsvoice";
+	//const char *fn_voice = "/" MOUNT_NAME "/mei/mei_sad.htsvoice";
+	//const char *fn_voice = "/" MOUNT_NAME "/mei/mei_angry.htsvoice";
+	//const char *fn_voice = "/" MOUNT_NAME "/mei/mei_bashful.htsvoice";
+	//const char *fn_voice = "/" MOUNT_NAME "/mei/mei_happy.htsvoice";
+	//const char *fn_voice = "/" MOUNT_NAME "/mei/mei_normal.htsvoice";
+
 	Audio.power();
 
 	// connect wait
@@ -392,7 +591,7 @@ int main()
 		const char *fn_voice = synse_list[i].voice;
 
 		wmem_init();
-
+#if !OPEN_JTALK
 		/* initialize hts_engine API */
 		HTS_Engine_initialize(&engine);
 
@@ -421,6 +620,31 @@ int main()
 
 		/* free memory */
 		HTS_Engine_clear(&engine);
+#else
+		/* initialize Open JTalk */
+		Open_JTalk_initialize(&open_jtalk);
+
+		/* load dictionary and HTS voice */
+		if (Open_JTalk_load(&open_jtalk, dn_dict, fn_voice) != TRUE) {
+			fprintf(stderr, "Error: Dictionary or HTS voice cannot be loaded.\n");
+			Open_JTalk_clear(&open_jtalk);
+			return 1;
+		}
+
+		//HTS_Engine_set_sampling_frequency(&open_jtalk.engine, 48000);
+
+		HTS_Engine_set_audio_buff_size(&open_jtalk.engine, AUDIO_BUFF_SIZE / sizeof(short));
+
+		/* synthesize */
+		if (Open_JTalk_synthesis(&open_jtalk, labels, count, NULL, NULL) != TRUE) {
+			fprintf(stderr, "Error: waveform cannot be synthesized.\n");
+			Open_JTalk_clear(&open_jtalk);
+			return 1;
+		}
+
+		/* free memory */
+		Open_JTalk_clear(&open_jtalk);
+#endif
 	}
 
 	return 0;
