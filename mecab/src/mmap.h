@@ -172,7 +172,7 @@ template <class T> class Mmap {
 
     text = reinterpret_cast<T *>(p);
 #else
-    text = new T[length];
+    text = new T[length / sizeof(T)];
     CHECK_FALSE(::read(fd, text, length) >= 0)
         << "read() failed: " << filename;
 #endif

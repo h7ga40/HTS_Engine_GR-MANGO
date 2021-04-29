@@ -148,6 +148,10 @@ bool Tokenizer<N, P>::open(const Param &param) {
     dictionary_info_ = d;
   }
 
+  for (std::vector<std::pair<const Token *, size_t> >::iterator it = unk_tokens_.begin();
+      it != unk_tokens_.end(); ++it) {
+      HTS_free((void *)it->first);
+  }
   unk_tokens_.clear();
   for (size_t i = 0; i < property_.size(); ++i) {
     const char *key = property_.name(i);
@@ -234,13 +238,19 @@ bool is_valid_node(const Lattice *lattice,  N *node) {
     for (size_t k = 0; k < size; ++k) {                                  \
       N *new_node = allocator->newNode();                                \
       read_node_info(unkdic_, *(token + k), &new_node);                  \
+      const char *temp = new_node->feature;                              \
+      new_node->feature = allocator->strdup(new_node->feature, strlen(new_node->feature) + 1); \
+      HTS_free((void *)temp);                                            \
       new_node->char_type = cinfo.default_type;                          \
       new_node->surface = begin2;                                        \
       new_node->length = begin3 - begin2;                                \
       new_node->rlength = begin3 - begin;                                \
       new_node->stat = MECAB_UNK_NODE;                                   \
       new_node->bnext = result_node;                                     \
-      if (unk_feature_.get()) new_node->feature = unk_feature_.get();    \
+      if (unk_feature_.get()) {                                          \
+        HTS_free((void *)new_node->feature);                             \
+        new_node->feature = unk_feature_.get();                          \
+      }                                                                  \
       if (isPartial && !is_valid_node(lattice, new_node)) { continue; }  \
       result_node = new_node; } } while (0)
 
@@ -284,6 +294,9 @@ N *Tokenizer<N, P>::lookup(const char *begin, const char *end,
       for (size_t j = 0; j < size; ++j) {
         N *new_node = allocator->newNode();
         read_node_info(**it, *(token + j), &new_node);
+        const char *temp = new_node->feature;
+        new_node->feature = allocator->strdup(new_node->feature, strlen(new_node->feature) + 1);
+        HTS_free((void *)temp);
         new_node->length = daresults[i].length;
         new_node->rlength = begin2 - begin + new_node->length;
         new_node->surface = begin2;
@@ -295,6 +308,7 @@ N *Tokenizer<N, P>::lookup(const char *begin, const char *end,
         new_node->bnext = result_node;
         result_node = new_node;
       }
+      HTS_free((void *)token);
     }
   }
 
@@ -388,6 +402,10 @@ void Tokenizer<N, P>::close() {
     delete *it;
   }
   dic_.clear();
+  for (std::vector<std::pair<const Token *, size_t> >::iterator it = unk_tokens_.begin();
+      it != unk_tokens_.end(); ++it) {
+    HTS_free((void *)it->first);
+  }
   unk_tokens_.clear();
   property_.close();
 }

@@ -20,6 +20,8 @@ namespace zlib {
 #define LG(p)((unsigned long)(SH(p)) |((unsigned long)(SH((p)+2)) << 16))
 #endif
 
+#include "fmap.h"
+
 namespace MeCab {
 
 namespace Darts {
@@ -62,7 +64,7 @@ class DoubleArrayImpl {
     array_u_type_ check;
   };
 
-  unit_t        *array_;
+  Fmap<unit_t>  *array_;
   unsigned char *used_;
   size_t        size_;
   size_t        alloc_size_;
@@ -80,7 +82,8 @@ class DoubleArrayImpl {
     unit_t tmp;
     tmp.base = 0;
     tmp.check = 0;
-    array_ = _resize(array_, alloc_size_, new_size, tmp);
+    delete array_;
+    array_ = new Fmap<unit_t>(_resize(array_->get_buf(), alloc_size_, new_size, tmp), new_size);
     used_  = _resize(used_, alloc_size_, new_size,
                      static_cast<unsigned char>(0));
     alloc_size_ = new_size;
@@ -142,7 +145,7 @@ class DoubleArrayImpl {
 
       if (alloc_size_ <= pos) resize(pos + 1);
 
-      if (array_[pos].check) {
+      if ((*array_)[pos].check) {
         ++nonzero_num;
         continue;
       } else if (!first) {
@@ -158,7 +161,7 @@ class DoubleArrayImpl {
       if (used_[begin]) continue;
 
       for (size_t i = 1; i < siblings.size(); ++i)
-        if (array_[begin + siblings[i].code].check != 0) goto next;
+        if ((*array_)[begin + siblings[i].code].check != 0) goto next;
 
       break;
     }
@@ -177,13 +180,13 @@ class DoubleArrayImpl {
                  static_cast<size_t>(siblings[siblings.size() - 1].code + 1));
 
     for (size_t i = 0; i < siblings.size(); ++i)
-      array_[begin + siblings[i].code].check = begin;
+      array_->get_buf()[begin + siblings[i].code].check = begin;
 
     for (size_t i = 0; i < siblings.size(); ++i) {
       std::vector <node_t> new_siblings;
 
       if (!fetch(siblings[i], new_siblings)) {
-        array_[begin + siblings[i].code].base =
+          array_->get_buf()[begin + siblings[i].code].base =
             value_ ?
             static_cast<array_type_>(-value_[siblings[i].left]-1) :
             static_cast<array_type_>(-siblings[i].left-1);
@@ -198,7 +201,7 @@ class DoubleArrayImpl {
 
       } else {
         size_t h = insert(new_siblings);
-        array_[begin + siblings[i].code].base = h;
+        array_->get_buf()[begin + siblings[i].code].base = h;
       }
     }
 
@@ -230,11 +233,11 @@ class DoubleArrayImpl {
     x.length = l;
   }
 
-  void set_array(void *ptr, size_t size = 0) {
+  void set_array(int fd, int begin, int end) {
     clear();
-    array_ = reinterpret_cast<unit_t *>(ptr);
+    array_ = new Fmap<unit_t>(fd, begin, end);
     no_delete_ = true;
-    size_ = size;
+    size_ = end - begin;
   }
 
   const void *array() const {
@@ -243,7 +246,7 @@ class DoubleArrayImpl {
 
   void clear() {
     if (!no_delete_)
-      delete [] array_;
+      delete array_;
     delete [] used_;
     array_ = 0;
     used_ = 0;
@@ -259,7 +262,7 @@ class DoubleArrayImpl {
   size_t nonzero_size() const {
     size_t result = 0;
     for (size_t i = 0; i < size_; ++i)
-      if (array_[i].check) ++result;
+      if ((*array_)[i].check) ++result;
     return result;
   }
 
@@ -279,7 +282,7 @@ class DoubleArrayImpl {
 
     resize(8192);
 
-    array_[0].base = 1;
+    array_->get_buf()[0].base = 1;
     next_check_pos_ = 0;
 
     node_t root_node;
@@ -318,7 +321,7 @@ class DoubleArrayImpl {
 
     size_ = size;
     size_ /= sizeof(unit_t);
-    array_ = new unit_t[size_];
+    array_ = new Fmap<unit_t>(new unit_t[size_], size_);
     if (size_ != std::fread(reinterpret_cast<unit_t *>(array_),
                             sizeof(unit_t), size_, fp)) return -1;
     std::fclose(fp);
@@ -367,7 +370,7 @@ class DoubleArrayImpl {
 
     zlib::gzFile gzfp = zlib::gzopen(file, mode);
     if (!gzfp) return -1;
-    array_ = new unit_t[size_];
+    array_ = new Fmap<unit_t>(new unit_t[size_], size_);
     if (zlib::gzseek(gzfp, offset, SEEK_SET) != 0) return -1;
     zlib::gzread(gzfp, reinterpret_cast<unit_t *>(array_),
                  sizeof(unit_t) * size_);
@@ -404,20 +407,20 @@ class DoubleArrayImpl {
     T result;
     set_result(result, -1, 0);
 
-    register array_type_  b = array_[node_pos].base;
+    register array_type_  b = (*array_)[node_pos].base;
     register array_u_type_ p;
 
     for (register size_t i = 0; i < len; ++i) {
       p = b +(node_u_type_)(key[i]) + 1;
-      if (static_cast<array_u_type_>(b) == array_[p].check)
-        b = array_[p].base;
+      if (static_cast<array_u_type_>(b) == (*array_)[p].check)
+        b = (*array_)[p].base;
       else
         return result;
     }
 
     p = b;
-    array_type_ n = array_[p].base;
-    if (static_cast<array_u_type_>(b) == array_[p].check && n < 0)
+    array_type_ n = (*array_)[p].base;
+    if (static_cast<array_u_type_>(b) == (*array_)[p].check && n < 0)
       set_result(result, -n-1, len);
 
     return result;
@@ -431,31 +434,31 @@ class DoubleArrayImpl {
                             size_t node_pos = 0) const {
     if (!len) len = length_func_()(key);
 
-    register array_type_  b   = array_[node_pos].base;
+    register array_type_  b   = (*array_)[node_pos].base;
     register size_t     num = 0;
     register array_type_  n;
     register array_u_type_ p;
 
     for (register size_t i = 0; i < len; ++i) {
       p = b;  // + 0;
-      n = array_[p].base;
-      if ((array_u_type_) b == array_[p].check && n < 0) {
+      n = (*array_)[p].base;
+      if ((array_u_type_) b == (*array_)[p].check && n < 0) {
         // result[num] = -n-1;
         if (num < result_len) set_result(result[num], -n-1, i);
         ++num;
       }
 
       p = b +(node_u_type_)(key[i]) + 1;
-      if ((array_u_type_) b == array_[p].check)
-        b = array_[p].base;
+      if ((array_u_type_) b == (*array_)[p].check)
+        b = (*array_)[p].base;
       else
         return num;
     }
 
     p = b;
-    n = array_[p].base;
+    n = (*array_)[p].base;
 
-    if ((array_u_type_)b == array_[p].check && n < 0) {
+    if ((array_u_type_)b == (*array_)[p].check && n < 0) {
       if (num < result_len) set_result(result[num], -n-1, len);
       ++num;
     }
@@ -469,22 +472,22 @@ class DoubleArrayImpl {
                       size_t len = 0) const {
     if (!len) len = length_func_()(key);
 
-    register array_type_  b = array_[node_pos].base;
+    register array_type_  b = (*array_)[node_pos].base;
     register array_u_type_ p;
 
     for (; key_pos < len; ++key_pos) {
       p = b +(node_u_type_)(key[key_pos]) + 1;
-      if (static_cast<array_u_type_>(b) == array_[p].check) {
+      if (static_cast<array_u_type_>(b) == (*array_)[p].check) {
         node_pos = p;
-        b = array_[p].base;
+        b = (*array_)[p].base;
       } else {
         return -2;  // no node
       }
     }
 
     p = b;
-    array_type_ n = array_[p].base;
-    if (static_cast<array_u_type_>(b) == array_[p].check && n < 0)
+    array_type_ n = (*array_)[p].base;
+    if (static_cast<array_u_type_>(b) == (*array_)[p].check && n < 0)
       return -n-1;
 
     return -1;  // found, but no value

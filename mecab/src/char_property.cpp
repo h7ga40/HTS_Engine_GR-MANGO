@@ -91,19 +91,30 @@ bool CharProperty::open(const char *filename) {
   CHECK_FALSE(fsize == cmmap_->size())
       << "invalid file size: " << filename;
 
+  for (auto i = clist_.begin(); i != clist_.end(); i++) {
+    HTS_free((void *)*i);
+  }
   clist_.clear();
   for (unsigned int i = 0; i < csize; ++i) {
-    const char *s = read_ptr(&ptr, 32);
+    const char *s = HTS_strdup(read_ptr(&ptr, 32));
     clist_.push_back(s);
   }
 
-  map_ = reinterpret_cast<const CharInfo *>(ptr);
+  map_ = (const CharInfo *)HTS_calloc(0xffff, sizeof(unsigned int));
+  memcpy((void *)map_, ptr, sizeof(unsigned int) * 0xffff);
+
+  cmmap_->close();
 
   return true;
 }
 
 void CharProperty::close() {
-  cmmap_->close();
+  for (auto i = clist_.begin(); i != clist_.end(); i++) {
+      HTS_free((void *)*i);
+  }
+  clist_.clear();
+  HTS_free((void *)map_);
+  map_ = NULL;
 }
 
 size_t CharProperty::size() const { return clist_.size(); }

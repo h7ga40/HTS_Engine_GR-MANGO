@@ -56,12 +56,13 @@ class EncoderLearnerTagger: public LearnerTagger {
   int eval(size_t *, size_t *, size_t *) const;
   float gradient(float *expected);
   explicit EncoderLearnerTagger(): eval_size_(1024), unk_eval_size_(1024) {}
-  virtual ~EncoderLearnerTagger() { close(); }
+  virtual ~EncoderLearnerTagger() { clear(); close(); }
 
  private:
   size_t eval_size_;
   size_t unk_eval_size_;
   std::vector<LearnerPath *> ans_path_list_;
+  void clear();
 };
 
 class DecoderLearnerTagger: public LearnerTagger {

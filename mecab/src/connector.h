@@ -7,7 +7,7 @@
 #define MECAB_CONNECTOR_H_
 
 #include "mecab.h"
-#include "mmap.h"
+#include "fmap.h"
 #include "common.h"
 #include "scoped_ptr.h"
 
@@ -16,7 +16,7 @@ class Param;
 
 class Connector {
  private:
-  scoped_ptr<Mmap<short> >  cmmap_;
+  scoped_ptr<Fmap<short> >  cmmap_;
   short          *matrix_;
   unsigned short  lsize_;
   unsigned short  rsize_;
@@ -59,7 +59,7 @@ class Connector {
   static bool compile(const char *, const char *);
 
   explicit Connector():
-      cmmap_(new Mmap<short>), matrix_(0), lsize_(0), rsize_(0) {}
+      cmmap_(new Fmap<short>), matrix_(0), lsize_(0), rsize_(0) {}
 
   virtual ~Connector() { this->close(); }
 };

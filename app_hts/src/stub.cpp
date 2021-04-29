@@ -85,6 +85,9 @@ void *safe_wcalloc(size_t size)
 extern "C"
 void wfree(void *mem)
 {
+	if (mem == NULL)
+		return;
+
 	htsmem_release(p_htsmemb, mem);
 }
 

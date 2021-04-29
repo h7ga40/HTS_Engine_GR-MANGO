@@ -30,7 +30,7 @@ template <class T> class FreeList {
       li_++;
       pi_ = 0;
     }
-    if (li_ == freeList.size()) freeList.push_back(new T[size]);
+    if (li_ == freeList.size()) freeList.push_back((T *)HTS_calloc(size, sizeof(T)));
     return freeList[li_] + (pi_++);
   }
 
@@ -38,7 +38,7 @@ template <class T> class FreeList {
 
   virtual ~FreeList() {
     for (li_ = 0; li_ < freeList.size(); li_++)
-      delete [] freeList[li_];
+      HTS_free((void *)freeList[li_]);
   }
 };
 
@@ -69,7 +69,7 @@ template <class T> class ChunkFreeList {
       pi_ = 0;
     }
     size_t _size = std::max(req, default_size);
-    freelist_.push_back(std::make_pair(_size, new T[_size]));
+    freelist_.push_back(std::make_pair(_size, (T *)HTS_calloc(_size, sizeof(T))));
     li_ = freelist_.size() - 1;
     pi_ += req;
     return freelist_[li_].second;
@@ -80,7 +80,7 @@ template <class T> class ChunkFreeList {
 
   virtual ~ChunkFreeList() {
     for (li_ = 0; li_ < freelist_.size(); li_++)
-      delete [] freelist_[li_].second;
+      HTS_free((void *)freelist_[li_].second);
   }
 };
 }

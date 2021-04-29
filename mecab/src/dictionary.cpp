@@ -82,7 +82,7 @@ bool Dictionary::open(const char *file, const char *mode) {
   CHECK_FALSE(dmmap_->size() >= 100)
       << "dictionary file is broken: " << file;
 
-  const char *ptr = dmmap_->begin();
+  off_t ptr = dmmap_->begin();
 
   unsigned int dsize;
   unsigned int tsize;
@@ -90,33 +90,32 @@ bool Dictionary::open(const char *file, const char *mode) {
   unsigned int magic;
   unsigned int dummy;
 
-  read_static<unsigned int>(&ptr, magic);
+  ptr += dmmap_->read(&magic, ptr, sizeof(unsigned int));
   CHECK_FALSE((magic ^ DictionaryMagicID) == dmmap_->size())
       << "dictionary file is broken: " << file;
 
-  read_static<unsigned int>(&ptr, version_);
+  ptr += dmmap_->read(&version_, ptr, sizeof(unsigned int));
   CHECK_FALSE(version_ == DIC_VERSION)
       << "incompatible version: " << version_;
 
-  read_static<unsigned int>(&ptr, type_);
-  read_static<unsigned int>(&ptr, lexsize_);
-  read_static<unsigned int>(&ptr, lsize_);
-  read_static<unsigned int>(&ptr, rsize_);
-  read_static<unsigned int>(&ptr, dsize);
-  read_static<unsigned int>(&ptr, tsize);
-  read_static<unsigned int>(&ptr, fsize);
-  read_static<unsigned int>(&ptr, dummy);
+  ptr += dmmap_->read(&type_, ptr, sizeof(unsigned int));
+  ptr += dmmap_->read(&lexsize_, ptr, sizeof(unsigned int));
+  ptr += dmmap_->read(&lsize_, ptr, sizeof(unsigned int));
+  ptr += dmmap_->read(&rsize_, ptr, sizeof(unsigned int));
+  ptr += dmmap_->read(&dsize, ptr, sizeof(unsigned int));
+  ptr += dmmap_->read(&tsize, ptr, sizeof(unsigned int));
+  ptr += dmmap_->read(&fsize, ptr, sizeof(unsigned int));
+  ptr += dmmap_->read(&dummy, ptr, sizeof(unsigned int));
 
-  charset_ = ptr;
-  ptr += 32;
-  da_.set_array(reinterpret_cast<void *>(const_cast<char*>(ptr)));
+  ptr += dmmap_->read(charset_, ptr, sizeof(charset_));
 
+  da_.set_array(dmmap_->get_fd(), ptr, ptr + dsize);
   ptr += dsize;
 
-  token_ = reinterpret_cast<const Token *>(ptr);
+  token_ = new Fmap<Token>(dmmap_->get_fd(), ptr, ptr + tsize);
   ptr += tsize;
 
-  feature_ = ptr;
+  feature_ = new Fmap<char>(dmmap_->get_fd(), ptr, ptr + fsize);
   ptr += fsize;
 
   CHECK_FALSE(ptr == dmmap_->end())

@@ -197,6 +197,16 @@ bool EncoderLearnerTagger::read(std::istream *is,
   return true;
 }
 
+void EncoderLearnerTagger::clear()
+{
+  for (int pos = 0;   pos <= static_cast<long>(len_);  ++pos) {
+    for (LearnerNode *node = begin_node_list_[pos]; node; node = node->bnext) {
+      HTS_free((void *)node->feature);
+      node->feature = NULL;
+    }
+  }
+}
+
 int EncoderLearnerTagger::eval(size_t *crr,
                                size_t *prec, size_t *recall) const {
   int zeroone = 0;

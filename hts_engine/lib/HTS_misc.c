@@ -529,8 +529,10 @@ void *HTS_calloc(const size_t num, const size_t size)
    mem = (void *) malloc(n);
 #endif                          /* FESTIVAL */
 
-   if (mem == NULL)
+   if (mem == NULL) {
       HTS_error(1, "HTS_calloc: Cannot allocate memory.\n");
+      return NULL;
+   }
 
    memset(mem, 0, n);
 

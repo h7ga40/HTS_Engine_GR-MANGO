@@ -91,7 +91,6 @@
 #include <algorithm> /* for Open JTalk */
 #include <cmath>     /* for Open JTalk */
 #include <sstream>   /* for Open JTalk */
-#endif
 
 #define COPYRIGHT "MeCab: Yet Another Part-of-Speech and Morphological Analyzer\n\
 \nCopyright(C) 2001-2012 Taku Kudo \nCopyright(C) 2004-2008 Nippon Telegraph and Telephone Corporation\n"
@@ -154,8 +153,6 @@
 #endif
 */
 #define WPATH(path) (path)
-
-#ifdef __cplusplus
 
 namespace MeCab {
 class die {

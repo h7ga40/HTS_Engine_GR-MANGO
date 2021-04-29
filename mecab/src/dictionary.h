@@ -7,7 +7,7 @@
 #define MECAB_DICTIONARY_H_
 
 #include "mecab.h"
-#include "mmap.h"
+#include "fmap.h"
 #include "darts.h"
 #include "char_property.h"
 
@@ -60,10 +60,25 @@ class Dictionary {
   size_t rsize() const { return static_cast<size_t>(rsize_); }
 
   const Token *token(const result_type &n) const {
-    return token_ +(n.value >> 8);
+    int size = token_size(n);
+    Token *result = (Token *)HTS_calloc(size, sizeof(Token));
+    token_->read(result, token_->begin() + (n.value >> 8) * sizeof(Token), size * sizeof(Token));
+    return result;
   }
   size_t token_size(const result_type &n) const { return 0xff & n.value; }
-  const char  *feature(const Token &t) const { return feature_ + t.feature; }
+  const char *feature(const Token &t) const {
+      size_t size = 0;
+      for (int i = feature_->begin() + t.feature; i < feature_->end(); i++) {
+          char c;
+          feature_->read(&c, i, sizeof(c));
+          if (c == 0)
+              break;
+          size++;
+      }
+      char *result = (char *)HTS_calloc(size + 1, sizeof(char));
+      feature_->read(result, feature_->begin() + t.feature, size);
+      return result;
+  }
 
   static bool compile(const Param &param,
                       const std::vector<std::string> &dics,
@@ -77,15 +92,15 @@ class Dictionary {
 
   const char *what() { return what_.str(); }
 
-  explicit Dictionary(): dmmap_(new Mmap<char>), token_(0),
-                         feature_(0), charset_(0) {}
+  explicit Dictionary(): dmmap_(new Fmap<char>), token_(nullptr),
+                         feature_(nullptr) {}
   virtual ~Dictionary() { this->close(); }
 
  private:
-  scoped_ptr<Mmap<char> > dmmap_;
-  const Token        *token_;
-  const char         *feature_;
-  const char         *charset_;
+  scoped_ptr<Fmap<char>> dmmap_;
+  Fmap<Token>        *token_;
+  Fmap<char>         *feature_;
+  char                charset_[32] = {0};
   unsigned int        version_;
   unsigned int        type_;
   unsigned int        lexsize_;

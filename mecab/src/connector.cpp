@@ -24,25 +24,35 @@ bool Connector::open(const char* filename,
   CHECK_FALSE(cmmap_->open(filename, mode))
       << "cannot open: " << filename;
 
-  matrix_ = cmmap_->begin();
+  off_t ptr = cmmap_->begin();
+  size_t fsize = cmmap_->size();
 
-  CHECK_FALSE(matrix_) << "matrix is NULL" ;
-  CHECK_FALSE(cmmap_->size() >= 2)
+  CHECK_FALSE(fsize >= 2)
       << "file size is invalid: " << filename;
 
-  lsize_ = static_cast<unsigned short>((*cmmap_)[0]);
-  rsize_ = static_cast<unsigned short>((*cmmap_)[1]);
+  ptr += cmmap_->read(&lsize_, ptr, sizeof(unsigned short));
+  ptr += cmmap_->read(&rsize_, ptr, sizeof(unsigned short));
 
   CHECK_FALSE(static_cast<size_t>(lsize_ * rsize_ + 2)
-                    == cmmap_->size())
+                    == fsize)
       << "file size is invalid: " << filename;
 
-  matrix_ = cmmap_->begin() + 2;
+  matrix_ = (short *)HTS_calloc(lsize_ * rsize_, sizeof(unsigned short));
+  CHECK_FALSE(matrix_) << "matrix is NULL" ;
+
+  short *pos = matrix_;
+  while (ptr < fsize) {
+    ptr += cmmap_->read(pos, ptr, sizeof(unsigned short));
+  }
+
+  cmmap_->close();
+
   return true;
 }
 
 void Connector::close() {
-  cmmap_->close();
+  HTS_free((void *)matrix_);
+  matrix_ = NULL;
 }
 
 bool Connector::openText(const char *filename) {

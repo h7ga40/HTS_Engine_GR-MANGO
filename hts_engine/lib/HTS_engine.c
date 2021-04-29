@@ -107,7 +107,7 @@ void HTS_Engine_initialize(HTS_Engine * engine)
 }
 
 /* HTS_Engine_load: load HTS voices */
-HTS_Boolean HTS_Engine_load(HTS_Engine * engine, const char **voices, size_t num_voices)
+HTS_Boolean HTS_Engine_load(HTS_Engine * engine, const char * const*voices, size_t num_voices)
 {
    size_t i, j;
    size_t nstream;
