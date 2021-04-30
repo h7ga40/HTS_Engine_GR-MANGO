@@ -1,6 +1,7 @@
 # HTS_Engine for GR-MANGO
 
 OSSの音声合成ソフト[OpenJTalk](http://open-jtalk.sp.nitech.ac.jp/)のエンジン[hts_engine API](http://hts-engine.sourceforge.net/)を[GR-MANGO](https://www.renesas.com/jp/ja/products/gadget-renesas/boards/gr-mango)で動かしたサンプルプログラム。
+（その後、OpenJTalkも組込みました。）
 
 [Mbed](https://os.mbed.com/platforms/Renesas-GR-MANGO/)ライブラリと[Mbed Library for GR-Boards mbed-gr-libs](https://github.com/renesas-rz/mbed-gr-libs)を使用し、[SSIF loop back sample](https://github.com/renesas-rz/RZ_A2M_Mbed_samples/blob/master/sample_programs/sample_02_ssif_loop_back.cpp)を改造して作りました。
 
@@ -56,6 +57,7 @@ OSSの音声合成ソフト[OpenJTalk](http://open-jtalk.sp.nitech.ac.jp/)のエ
 |mei\\mei_happy.htsvoice|MMDAgent|
 |mei\\mei_normal.htsvoice|MMDAgent|
 |mei\\mei_sad.htsvoice|MMDAgent|
+|dic\\*|OpenJTalk|
 
 htsvoiceファイルは下記のサイトからダウンロードしてください。
 
@@ -64,10 +66,13 @@ htsvoiceファイルは下記のサイトからダウンロードしてくださ
   [OpenJTalk](https://sourceforge.net/projects/open-jtalk/files/)から、次のようにフォルダ辿って「HTS voice」→「hts_voice_nitech_jp_atr503_m001-1.05」、「[hts_voice_nitech_jp_atr503_m001-1.05.tar.gz](https://sourceforge.net/projects/open-jtalk/files/HTS%20voice/hts_voice_nitech_jp_atr503_m001-1.05/hts_voice_nitech_jp_atr503_m001-1.05.tar.gz/download)」をダウンロードします。
   「nitech_jp_atr503_m001.htsvoice」をSDカードのルートフォルダに入れます。
 
+  OpenJTalkを使う場合は、「Dictionary」→「open_jtalk_dic-1.11」と辿って、「[open_jtalk_dic_utf_8-1.11.tar.gz](https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download)」をダウンロードします。
+  「open_jtalk_dic_utf_8-1.11」フォルダの中身をSDカードの「dir」フォルダに入れます。
+
 - MMDAgent
 
   [MMDAgent](http://www.mmdagent.jp/)から、「MMDAgent "Sample Script"」にある「[Source code](https://sourceforge.net/projects/mmdagent/files/MMDAgent_Example/MMDAgent_Example-1.8/MMDAgent_Example-1.8.zip/download)」をクリックしてダウンロードします。
-  「Voice\\mei」フォルダをSDカードのルートフォルダに入れます。
+  「Voice\\mei」フォルダをSDカードの「mei」フォルダに入れます。
 
 ### 参考サイト
 
@@ -82,6 +87,8 @@ Renesasさんの[MbedのWiki](https://os.mbed.com/teams/Renesas/wiki/How-to-debu
 「app_hts.launch」を用意したので参考サイトの手順「New Configuration」を行わず「app_hts」を選択でも可能です。
 
 ## 変更点
+
+[Qiita](https://qiita.com/h7ga40/items/daa71423a2ce9d6c54ea)にも、変更内容の一部を詳しく書きました。
 
 ### HTS Engineの省メモリ化
 
@@ -99,6 +106,10 @@ Renesasさんの[MbedのWiki](https://os.mbed.com/teams/Renesas/wiki/How-to-debu
 
 - HTS Engineの呼び出しを追加。
 - マイクからの入力では無く、HTS Engineからの合成結果で音声出力するよう変更。
+
+### OpenJTalkのmmap処理変更
+
+- `mmap`は使えないので、ファイルを全てメモリに読み込むようになっているが、`sys.dic`ファイルはサイズが100MByte近くあるので、値が必要な場合は随時ファイルから読み出すように変更。
 
 ## ライセンス
 
