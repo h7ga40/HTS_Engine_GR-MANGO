@@ -7,17 +7,7 @@ OSSの音声合成ソフト[OpenJTalk](http://open-jtalk.sp.nitech.ac.jp/)のエ
 
 ## ！注意！
 
-RZ/A2Mに関する[テクニカルアップデート](https://www.renesas.com/jp/ja/document/tcu/note-size-octaram-memory-octa-memory-controller-rza2m-group-products?language=ja&r=1054511)によりOctaRAMは8MByteまでしか使えないらしいです！
-
-手元のGR-MANGOでは16MByte使えているように見えますので不思議です。手元のは2017年製のようです。
-
-![RZ/A2M](img/rza2m.jpg)
-
-[ここ](bin/app_hts.bin)にバイナリファイルを置いたので、8MByteしか使えないGR-MANGOか試してからお使いください。
-
-e2studioの「メモリ」でも確認できます。
-
-![メモリ](img/e2studio_memory.gif)
+RZ/A2Mに関する[テクニカルアップデート](https://www.renesas.com/jp/ja/document/tcu/note-size-octaram-memory-octa-memory-controller-rza2m-group-products?language=ja&r=1054511)によりOctaRAMは8MByteまでしか使えてませんでした。
 
 ## ビルド方法
 
