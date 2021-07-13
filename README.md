@@ -1,9 +1,23 @@
-# HTS_Engine for GR-MANGO
+# OpenJTalk for GR-MANGO
 
 OSSの音声合成ソフト[OpenJTalk](http://open-jtalk.sp.nitech.ac.jp/)のエンジン[hts_engine API](http://hts-engine.sourceforge.net/)を[GR-MANGO](https://www.renesas.com/jp/ja/products/gadget-renesas/boards/gr-mango)で動かしたサンプルプログラム。
 （その後、OpenJTalkも組込みました。）
 
 [Mbed](https://os.mbed.com/platforms/Renesas-GR-MANGO/)ライブラリと[Mbed Library for GR-Boards mbed-gr-libs](https://github.com/renesas-rz/mbed-gr-libs)を使用し、[SSIF loop back sample](https://github.com/renesas-rz/RZ_A2M_Mbed_samples/blob/master/sample_programs/sample_02_ssif_loop_back.cpp)を改造して作りました。
+
+## ！注意！
+
+RZ/A2Mに関する[テクニカルアップデート](https://www.renesas.com/jp/ja/document/tcu/note-size-octaram-memory-octa-memory-controller-rza2m-group-products?language=ja&r=1054511)によりOctaRAMは8MByteまでしか使えないらしいです！
+
+手元のGR-MANGOでは16MByte使えているように見えますので不思議です。手元のは2017年製のようです。
+
+![RZ/A2M](img/rza2m.jpg)
+
+[ここ](bin/app_hts.bin)にバイナリファイルを置いたので、8MByteしか使えないGR-MANGOか試してからお使いください。
+
+e2studioの「メモリ」でも確認できます。
+
+![メモリ](img/e2studio_memory.gif)
 
 ## ビルド方法
 
